@@ -14,7 +14,7 @@ This model is trained on the IAM handwriting dataset and was inspired by the mod
 
 The model at one time step looks like this: 
 ![overview](static/model_rolled.png?raw=true =50x)
-<img src="static/model_rolled.png" alt="Model overview" style="width: 50%;"/>
+<img src="static/model_rolled.png" alt="Model overview" style="width: 50px;"/>
 
 Unrolling in time, we get
 ![overview](static/model_unrolled.png?raw=true =250x)
