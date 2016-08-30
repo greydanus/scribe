@@ -2,9 +2,9 @@ Scribe: Realist Handwriting in Tensorflow
 =======
 See [blog post](https://greydanus.github.io/2016/08/21/handwriting/)
 
-iPython Notebooks
+Jupyter Notebooks
 --------
-For an easy intro to the code (along with equations and explanations) check out these iPython notebooks:
+For an easy intro to the code (along with equations and explanations) check out these Jupyter notebooks:
 * [inspecting the data](https://nbviewer.jupyter.org/github/greydanus/scribe/blob/master/dataloader.ipynb)
 * [sampling from the model](https://nbviewer.jupyter.org/github/greydanus/scribe/blob/master/sample.ipynb)
 
