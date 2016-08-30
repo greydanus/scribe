@@ -13,8 +13,7 @@ About
 This model is trained on the IAM handwriting dataset and was inspired by the model described by the famous 2014 Alex Graves [paper](https://arxiv.org/abs/1308.0850). It consists of a three-layer recurrent neural network (LSTM cells) with a Gaussian Mixture Density Network (MDN) cap on top. I have also implemented the attention mechanism from the paper which allows the network to 'focus' on character at a time in a sequence as it draws them.
 
 The model at one time step looks like this: 
-![overview](static/model_rolled.png?raw=true =50x)
-<img src="static/model_rolled.png" alt="Model overview" style="width: 50px;"/>
+<img src="static/model_rolled.png" alt="Model overview" style="height: 50px;"/>
 
 Unrolling in time, we get
 ![overview](static/model_unrolled.png?raw=true =250x)
