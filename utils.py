@@ -134,8 +134,12 @@ class DataLoader():
         # goes thru the list, and only keeps the text entries that have more than tsteps points
         self.stroke_data = []
         self.ascii_data = []
+        self.valid_stroke_data = []
+        self.valid_ascii_data = []
         counter = 0
 
+        # every 1 in 20 (5%) will be used for validation data
+        cur_data_counter = 0
         for i in range(len(self.raw_stroke_data)):
             data = self.raw_stroke_data[i]
             if len(data) > (self.tsteps+2):
@@ -144,15 +148,34 @@ class DataLoader():
                 data = np.maximum(data, -self.limit)
                 data = np.array(data,dtype=np.float32)
                 data[:,0:2] /= self.data_scale
-                
-                self.stroke_data.append(data)
-                self.ascii_data.append(self.raw_ascii_data[i])
+                cur_data_counter = cur_data_counter + 1
+                if cur_data_counter % 20 == 0:
+                  self.valid_stroke_data.append(data)
+                  self.valid_ascii_data.append(self.raw_ascii_data[i])
+                else:
+                    self.stroke_data.append(data)
+                    self.ascii_data.append(self.raw_ascii_data[i])
 
         # minus 1, since we want the ydata to be a shifted version of x data
         self.num_batches = int(len(self.stroke_data) / self.batch_size)
         self.logger.write("\tloaded dataset:")
-        self.logger.write("\t\t{} individual data points".format(len(self.stroke_data)))
+        self.logger.write("\t\t{} train individual data points".format(len(self.stroke_data)))
+        self.logger.write("\t\t{} valid individual data points".format(len(self.valid_stroke_data)))
         self.logger.write("\t\t{} batches".format(self.num_batches))
+
+    def validation_data(self):
+        # returns validation data
+        x_batch = []
+        y_batch = []
+        ascii_list = []
+        for i in range(self.batch_size):
+            valid_ix = i%len(self.valid_stroke_data)
+            data = self.valid_stroke_data[valid_ix]
+            x_batch.append(np.copy(data[:self.tsteps]))
+            y_batch.append(np.copy(data[1:self.tsteps+1]))
+            ascii_list.append(self.valid_ascii_data[valid_ix])
+        one_hots = [to_one_hot(s, self.ascii_steps, self.alphabet) for s in ascii_list]
+        return x_batch, y_batch, ascii_list, one_hots
 
     def next_batch(self):
         # returns a randomized, tsteps-sized portion of the training data
