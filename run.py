@@ -68,6 +68,9 @@ def train_model(args):
 	logger.write("attempt to load saved model...")
 	load_was_success, global_step = model.try_load_model(args.save_path)
 
+	v_x, v_y, v_s, v_c = data_loader.validation_data()
+	valid_inputs = {model.input_data: v_x, model.target_data: v_y, model.char_seq: v_c}
+
 	logger.write("training...")
 	model.sess.run(tf.assign(model.decay, args.decay ))
 	model.sess.run(tf.assign(model.momentum, args.momentum ))
@@ -96,12 +99,15 @@ def train_model(args):
 					model.istate_cell0.h: h0, model.istate_cell1.h: h1, model.istate_cell2.h: h2}
 
 			[train_loss, _] = model.sess.run([model.cost, model.train_op], feed)
+			feed.update(valid_inputs)
+			feed[model.init_kappa] = np.zeros((args.batch_size, args.kmixtures, 1))
+			[valid_loss] = model.sess.run([model.cost], feed)
 			
 			running_average = running_average*remember_rate + train_loss*(1-remember_rate)
 
 			end = time.time()
-			if i % 10 is 0: logger.write("{}/{}, loss = {:.3f}, regloss = {:.5f}, time = {:.3f}" \
-				.format(i, args.nepochs * args.nbatches, train_loss, running_average, end - start) )
+			if i % 10 is 0: logger.write("{}/{}, loss = {:.3f}, regloss = {:.5f}, valid_loss = {:.3f}, time = {:.3f}" \
+				.format(i, args.nepochs * args.nbatches, train_loss, running_average, valid_loss, end - start) )
 
 def sample_model(args, logger=None):
 	if args.text == '':
