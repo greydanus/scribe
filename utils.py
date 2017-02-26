@@ -7,6 +7,9 @@ import xml.etree.ElementTree as ET
 
 from utils import *
 
+max_allowable_stroke = 1023
+max_allowable_ascii = 70
+
 class DataLoader():
     def __init__(self, args, logger, limit = 500):
         self.data_dir = args.data_dir
@@ -135,12 +138,17 @@ class DataLoader():
                 line_number = int(line_number) - 1
                 ascii = getAscii(ascii_file, line_number)
                 alphabet = alphabet.union(set(ascii))
-                if len(stroke) > longest_stroke:
-                    longest_stroke = len(stroke)
-                if len(ascii) > longest_ascii:
-                    longest_ascii = len(ascii)
-                strokes.append(stroke)
-                asciis.append(ascii)
+                if len(stroke) > max_allowable_stroke:
+                    print("stroke for {} is too long ({}), skipping".format(ascii, len(stroke)))
+                elif len(ascii) > max_allowable_ascii:
+                    print("ascii for {} is too long, skipping".format(ascii))
+                else:
+                    if len(stroke) > longest_stroke:
+                        longest_stroke = len(stroke)
+                    if len(ascii) > longest_ascii:
+                        longest_ascii = len(ascii)
+                    strokes.append(stroke)
+                    asciis.append(ascii)
 
         print("Longest stroke: {}".format(longest_stroke))
         print("Longest ascii: {}".format(longest_ascii))
