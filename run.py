@@ -53,18 +53,23 @@ def main():
 	parser.set_defaults(train=True)
 	args = parser.parse_args()
 
-	train_model(args) if args.train else sample_model(args)
 
-def train_model(args):
 	logger = Logger(args) # make logging utility
-	logger.write("\nTRAINING MODE...")
 	logger.write("{}\n".format(args))
 	logger.write("loading data...")
 	data_loader = DataLoader(args, logger=logger)
 	
 	logger.write("building model...")
-	model = Model(args, logger=logger)
+	# temporary hack until we can refactor
+	model = Model(args, data_loader, logger=logger)
 
+	if args.train:
+		train_model(args, logger, data_loader, model)
+	else:
+		sample_model(args, logger, data_loader, model)
+
+def train_model(args, logger, data_loader, model):
+	logger.write("\nTRAINING MODE...")
 	logger.write("attempt to load saved model...")
 	load_was_success, global_step = model.try_load_model(args.save_path)
 
@@ -109,19 +114,14 @@ def train_model(args):
 			if i % 10 is 0: logger.write("{}/{}, loss = {:.3f}, regloss = {:.5f}, valid_loss = {:.3f}, time = {:.3f}" \
 				.format(i, args.nepochs * args.nbatches, train_loss, running_average, valid_loss, end - start) )
 
-def sample_model(args, logger=None):
+def sample_model(args, logger, data_loader, model):
+	logger.write("\nSAMPLING MODE...")
+
 	if args.text == '':
 		strings = ['call me ishmael some years ago', 'A project by Sam Greydanus', 'mmm mmm mmm mmm mmm mmm mmm', \
 			'What I cannot create I do not understand', 'You know nothing Jon Snow'] # test strings
 	else:
 		strings = [args.text]
-
-	logger = Logger(args) if logger is None else logger # instantiate logger, if None
-	logger.write("\nSAMPLING MODE...")
-	logger.write("loading data...")
-	
-	logger.write("building model...")
-	model = Model(args, logger)
 
 	logger.write("attempt to load saved model...")
 	load_was_success, global_step = model.try_load_model(args.save_path)
