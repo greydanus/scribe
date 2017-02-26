@@ -10,7 +10,6 @@ from utils import *
 class DataLoader():
     def __init__(self, args, logger, limit = 500):
         self.data_dir = args.data_dir
-        self.alphabet = args.alphabet
         self.batch_size = args.batch_size
         self.tsteps = args.tsteps
         self.data_scale = args.data_scale # scale data down by this factor
@@ -73,6 +72,7 @@ class DataLoader():
             s = s[s.find("CSR"):]
             if len(s.split("\n")) > line_number+2:
                 s = s.split("\n")[line_number+2]
+                s = s.strip()
                 return s
             else:
                 return ""
@@ -103,6 +103,7 @@ class DataLoader():
         # build stroke database of every xml file inside iam database
         strokes = []
         asciis = []
+        alphabet = set()
         for i in range(len(filelist)):
             if (filelist[i][-3:] == 'xml'):
                 stroke_file = filelist[i]
@@ -113,22 +114,25 @@ class DataLoader():
                 line_number = stroke_file[-6:-4]
                 line_number = int(line_number) - 1
                 ascii = getAscii(ascii_file, line_number)
+                alphabet = alphabet.union(set(ascii))
                 if len(ascii) > 10:
                     strokes.append(stroke)
                     asciis.append(ascii)
                 else:
                     self.logger.write("\tline length was too short. line was: " + ascii)
                 
+        alphabet_string = "".join(sorted(alphabet))
+        print("Alphabet: {}".format(alphabet_string))
         assert(len(strokes)==len(asciis)), "There should be a 1:1 correspondence between stroke data and ascii labels."
         f = open(data_file,"wb")
-        pickle.dump([strokes,asciis], f, protocol=2)
+        pickle.dump([strokes,asciis,alphabet_string], f, protocol=2)
         f.close()
         self.logger.write("\tfinished parsing dataset. saved {} lines".format(len(strokes)))
 
 
     def load_preprocessed(self, data_file):
         f = open(data_file,"rb")
-        [self.raw_stroke_data, self.raw_ascii_data] = pickle.load(f)
+        [self.raw_stroke_data, self.raw_ascii_data, self.alphabet] = pickle.load(f)
         f.close()
 
         # goes thru the list, and only keeps the text entries that have more than tsteps points
@@ -184,7 +188,6 @@ class DataLoader():
         ascii_list = []
         for i in xrange(self.batch_size):
             data = self.stroke_data[self.idx_perm[self.pointer]]
-            idx = random.randint(0, len(data)-self.tsteps-2)
             x_batch.append(np.copy(data[:self.tsteps]))
             y_batch.append(np.copy(data[1:self.tsteps+1]))
             ascii_list.append(self.ascii_data[self.idx_perm[self.pointer]])
