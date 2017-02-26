@@ -19,7 +19,7 @@ def get_style_states(model, args):
         style_strokes, style_strings = pickle.load(f)
 
     style_strokes, style_string = style_strokes[args.style], style_strings[args.style]
-    style_onehot = [to_one_hot(style_string, model.ascii_steps, args.alphabet)]
+    style_onehot = [to_one_hot(style_string, model.ascii_steps, model.alphabet)]
         
     style_stroke = np.zeros((1, 1, 3), dtype=np.float32)
     style_kappa = np.zeros((1, args.kmixtures, 1))
@@ -38,7 +38,7 @@ def get_style_states(model, args):
 
 def sample(input_text, model, args):
     # initialize some parameters
-    one_hot = [to_one_hot(input_text, model.ascii_steps, args.alphabet)]         # convert input string to one-hot vector
+    one_hot = [to_one_hot(input_text, model.ascii_steps, model.alphabet)]         # convert input string to one-hot vector
     [c0, c1, c2, h0, h1, h2] = get_style_states(model, args) # get numpy zeros states for all three LSTMs
     kappa = np.zeros((1, args.kmixtures, 1))   # attention mechanism's read head should start at index 0
     prev_x = np.asarray([[[0, 0, 1]]], dtype=np.float32)     # start with a pen stroke at (0,0)
@@ -78,7 +78,7 @@ def sample(input_text, model, args):
         # test if finished (has the read head seen the whole ascii sequence?)
         # main_kappa_idx = np.where(alpha[0]==np.max(alpha[0]));
         # finished = True if kappa[0][main_kappa_idx] > len(input_text) else False
-        finished = True if i > args.tsteps else False
+        finished = True if i > model.tsteps else False
         
         # new input is previous output
         prev_x[0][0] = np.array([x1, x2, eos], dtype=np.float32)

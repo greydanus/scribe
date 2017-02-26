@@ -20,7 +20,7 @@ class Model():
 		self.nmixtures = args.nmixtures
 		self.kmixtures = args.kmixtures
 		self.batch_size = args.batch_size if self.train else 1 # training/sampling specific
-		self.tsteps = dataloader.tsteps if self.train else 1 # training/sampling specific
+		self.tsteps = dataloader.tsteps
 		self.alphabet = dataloader.alphabet
 		# training params
 		self.dropout = args.dropout
