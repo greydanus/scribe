@@ -63,7 +63,8 @@ def train_model(args):
 	data_loader = DataLoader(args, logger=logger)
 	
 	logger.write("building model...")
-	model = Model(args, logger=logger)
+	# temporary hack until we can refactor
+	model = Model(args, data_loader, logger=logger)
 
 	logger.write("attempt to load saved model...")
 	load_was_success, global_step = model.try_load_model(args.save_path)

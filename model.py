@@ -9,7 +9,7 @@ import tensorflow as tf
 from utils import *
 
 class Model():
-	def __init__(self, args, logger):
+	def __init__(self, args, dataloader, logger):
 		self.logger = logger
 
 		# ----- transfer some of the args params over to the model
@@ -20,13 +20,13 @@ class Model():
 		self.nmixtures = args.nmixtures
 		self.kmixtures = args.kmixtures
 		self.batch_size = args.batch_size if self.train else 1 # training/sampling specific
-		self.tsteps = args.tsteps if self.train else 1 # training/sampling specific
-		self.alphabet = args.alphabet
+		self.tsteps = dataloader.tsteps if self.train else 1 # training/sampling specific
+		self.alphabet = dataloader.alphabet
 		# training params
 		self.dropout = args.dropout
 		self.grad_clip = args.grad_clip
 		# misc
-		self.tsteps_per_ascii = args.tsteps_per_ascii
+		# self.tsteps_per_ascii = args.tsteps_per_ascii
 		self.data_dir = args.data_dir
 
 		self.graves_initializer = tf.truncated_normal_initializer(mean=0., stddev=.075, seed=None, dtype=tf.float32)
@@ -34,7 +34,8 @@ class Model():
 
 		self.logger.write('\tusing alphabet{}'.format(self.alphabet))
 		self.char_vec_len = len(self.alphabet) + 1 #plus one for <UNK> token
-		self.ascii_steps = args.tsteps/args.tsteps_per_ascii
+		# self.ascii_steps = args.tsteps/args.tsteps_per_ascii
+		self.ascii_steps = dataloader.ascii_steps
 
 
 		# ----- build the basic recurrent network architecture
