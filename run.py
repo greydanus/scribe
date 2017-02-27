@@ -53,28 +53,20 @@ def main():
 	parser.set_defaults(train=True)
 	args = parser.parse_args()
 
+	train_model(args) if args.train else sample_model(args)
 
+def train_model(args):
 	logger = Logger(args) # make logging utility
+	logger.write("\nTRAINING MODE...")
 	logger.write("{}\n".format(args))
 	logger.write("loading data...")
 	data_loader = DataLoader(args, logger=logger)
 	
 	logger.write("building model...")
-	# temporary hack until we can refactor
-	model = Model(args, data_loader, logger=logger)
+	model = Model(args, logger=logger)
 
-	if args.train:
-		train_model(args, logger, data_loader, model)
-	else:
-		sample_model(args, logger, data_loader, model)
-
-def train_model(args, logger, data_loader, model):
-	logger.write("\nTRAINING MODE...")
 	logger.write("attempt to load saved model...")
 	load_was_success, global_step = model.try_load_model(args.save_path)
-
-	v_x, v_y, v_s, v_c = data_loader.validation_data()
-	valid_inputs = {model.input_data: v_x, model.target_data: v_y, model.char_seq: v_c}
 
 	logger.write("training...")
 	model.sess.run(tf.assign(model.decay, args.decay ))
@@ -104,24 +96,26 @@ def train_model(args, logger, data_loader, model):
 					model.istate_cell0.h: h0, model.istate_cell1.h: h1, model.istate_cell2.h: h2}
 
 			[train_loss, _] = model.sess.run([model.cost, model.train_op], feed)
-			feed.update(valid_inputs)
-			feed[model.init_kappa] = np.zeros((args.batch_size, args.kmixtures, 1))
-			[valid_loss] = model.sess.run([model.cost], feed)
 			
 			running_average = running_average*remember_rate + train_loss*(1-remember_rate)
 
 			end = time.time()
-			if i % 10 is 0: logger.write("{}/{}, loss = {:.3f}, regloss = {:.5f}, valid_loss = {:.3f}, time = {:.3f}" \
-				.format(i, args.nepochs * args.nbatches, train_loss, running_average, valid_loss, end - start) )
+			if i % 10 is 0: logger.write("{}/{}, loss = {:.3f}, regloss = {:.5f}, time = {:.3f}" \
+				.format(i, args.nepochs * args.nbatches, train_loss, running_average, end - start) )
 
-def sample_model(args, logger, data_loader, model):
-	logger.write("\nSAMPLING MODE...")
-
+def sample_model(args, logger=None):
 	if args.text == '':
 		strings = ['call me ishmael some years ago', 'A project by Sam Greydanus', 'mmm mmm mmm mmm mmm mmm mmm', \
 			'What I cannot create I do not understand', 'You know nothing Jon Snow'] # test strings
 	else:
 		strings = [args.text]
+
+	logger = Logger(args) if logger is None else logger # instantiate logger, if None
+	logger.write("\nSAMPLING MODE...")
+	logger.write("loading data...")
+	
+	logger.write("building model...")
+	model = Model(args, logger)
 
 	logger.write("attempt to load saved model...")
 	load_was_success, global_step = model.try_load_model(args.save_path)

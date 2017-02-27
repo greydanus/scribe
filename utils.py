@@ -7,16 +7,14 @@ import xml.etree.ElementTree as ET
 
 from utils import *
 
-max_allowable_stroke = 1023
-max_allowable_ascii = 70
-
 class DataLoader():
     def __init__(self, args, logger, limit = 500):
         self.data_dir = args.data_dir
+        self.alphabet = args.alphabet
         self.batch_size = args.batch_size
-        # self.tsteps = args.tsteps
+        self.tsteps = args.tsteps
         self.data_scale = args.data_scale # scale data down by this factor
-        # self.ascii_steps = args.tsteps/args.tsteps_per_ascii
+        self.ascii_steps = args.tsteps/args.tsteps_per_ascii
         self.logger = logger
         self.limit = limit # removes large noisy gaps in the data
 
@@ -75,7 +73,6 @@ class DataLoader():
             s = s[s.find("CSR"):]
             if len(s.split("\n")) > line_number+2:
                 s = s.split("\n")[line_number+2]
-                s = s.strip()
                 return s
             else:
                 return ""
@@ -103,30 +100,9 @@ class DataLoader():
                     counter += 1
             return stroke_data
 
-        # pad strokes to equal length
-        def strokes_postprocess(strokes, longest_stroke):
-            padlen = longest_stroke + 1
-            numstrokes = len(strokes)
-            stroke_data = np.zeros((numstrokes, padlen, 3), dtype=np.int16)
-            for n in range(numstrokes):
-                len_current_stroke = len(strokes[n])
-                stroke_data[n][:len_current_stroke] = strokes[n]
-            return np.array(stroke_data)
-
-        # pad ascii strings to equal length
-        def ascii_postprocess(ascii, longest_ascii):
-            padlen = longest_ascii + 1
-            ascii_data = []
-            for s in ascii:
-                ascii_data.append(s.ljust(padlen, '_'))
-            return ascii_data
-
         # build stroke database of every xml file inside iam database
         strokes = []
         asciis = []
-        alphabet = set('_')
-        longest_stroke = 0
-        longest_ascii = 0
         for i in range(len(filelist)):
             if (filelist[i][-3:] == 'xml'):
                 stroke_file = filelist[i]
@@ -137,105 +113,46 @@ class DataLoader():
                 line_number = stroke_file[-6:-4]
                 line_number = int(line_number) - 1
                 ascii = getAscii(ascii_file, line_number)
-                alphabet = alphabet.union(set(ascii))
-                if len(stroke) > max_allowable_stroke:
-                    print("stroke for {} is too long ({}), skipping".format(ascii, len(stroke)))
-                elif len(ascii) > max_allowable_ascii:
-                    print("ascii for {} is too long, skipping".format(ascii))
-                else:
-                    if len(stroke) > longest_stroke:
-                        longest_stroke = len(stroke)
-                    if len(ascii) > longest_ascii:
-                        longest_ascii = len(ascii)
+                if len(ascii) > 10:
                     strokes.append(stroke)
                     asciis.append(ascii)
-
-        print("Longest stroke: {}".format(longest_stroke))
-        print("Longest ascii: {}".format(longest_ascii))
+                else:
+                    self.logger.write("\tline length was too short. line was: " + ascii)
+                
         assert(len(strokes)==len(asciis)), "There should be a 1:1 correspondence between stroke data and ascii labels."
-        strokes = strokes_postprocess(strokes, longest_stroke)
-        asciis = ascii_postprocess(asciis, longest_ascii)
-        stroke_length = strokes[0].shape[0]
-        ascii_length = len(asciis[0])
-        alphabet_string = "".join(sorted(alphabet))
-        metadata = {
-            'stroke_length': stroke_length,
-            'ascii_length': ascii_length,
-            'alphabet': alphabet_string
-            }
-        print("Metadata: {}".format(metadata))
         f = open(data_file,"wb")
-        pickle.dump([metadata,strokes,asciis], f, protocol=2)
+        pickle.dump([strokes,asciis], f, protocol=2)
         f.close()
         self.logger.write("\tfinished parsing dataset. saved {} lines".format(len(strokes)))
 
 
     def load_preprocessed(self, data_file):
         f = open(data_file,"rb")
-        [metadata, self.raw_stroke_data, self.raw_ascii_data] = pickle.load(f)
+        [self.raw_stroke_data, self.raw_ascii_data] = pickle.load(f)
         f.close()
-        self.alphabet = metadata['alphabet']
-        self.stroke_length = metadata['stroke_length']
-        self.ascii_length = metadata['ascii_length']
-        self.tsteps = self.stroke_length
-        self.ascii_steps = self.ascii_length
 
         # goes thru the list, and only keeps the text entries that have more than tsteps points
         self.stroke_data = []
         self.ascii_data = []
-        self.valid_stroke_data = []
-        self.valid_ascii_data = []
         counter = 0
-        num_training_chars = 0
-        num_valid_chars = 0
 
-        # every 1 in 20 (5%) will be used for validation data
-        cur_data_counter = 0
         for i in range(len(self.raw_stroke_data)):
             data = self.raw_stroke_data[i]
-            # print("COMPARE {} and {}".format(len(data), (self.tsteps+2)))
-            if len(data) == self.tsteps:
-            # if len(data) > (self.tsteps+2):
+            if len(data) > (self.tsteps+2):
                 # removes large gaps from the data
                 data = np.minimum(data, self.limit)
                 data = np.maximum(data, -self.limit)
                 data = np.array(data,dtype=np.float32)
                 data[:,0:2] /= self.data_scale
-                cur_data_counter = cur_data_counter + 1
-                cur_ascii = self.raw_ascii_data[i]
-                if cur_data_counter % 20 == 0:
-                    self.valid_stroke_data.append(data)
-                    self.valid_ascii_data.append(cur_ascii)
-                    num_valid_chars += len(cur_ascii.translate(None, '_'))
-                else:
-                    self.stroke_data.append(data)
-                    self.ascii_data.append(cur_ascii)
-                    num_training_chars += len(cur_ascii.translate(None, '_'))
+                
+                self.stroke_data.append(data)
+                self.ascii_data.append(self.raw_ascii_data[i])
 
         # minus 1, since we want the ydata to be a shifted version of x data
         self.num_batches = int(len(self.stroke_data) / self.batch_size)
         self.logger.write("\tloaded dataset:")
-        self.logger.write("\t\t{} stroke length".format(self.stroke_length))
-        self.logger.write("\t\t{} ascii length".format(self.ascii_length))
-        self.logger.write("\t\t{} alphabet length".format(len(self.alphabet)))
-        self.logger.write("\t\t{} train characters over {} sequences".format(num_training_chars, len(self.stroke_data)))
-        self.logger.write("\t\t{} valid characters over {} sequences".format(num_valid_chars, len(self.valid_stroke_data)))
-        self.logger.write("\t\t{} training batches".format(self.num_batches))
-
-    def validation_data(self):
-        # returns validation data
-        x_batch = []
-        y_batch = []
-        ascii_list = []
-        for i in range(self.batch_size):
-            valid_ix = i%len(self.valid_stroke_data)
-            data = self.valid_stroke_data[valid_ix]
-            data = np.vstack((data, [0, 0, 0]))
-            x_batch.append(np.copy(data[:self.tsteps]))
-            y_batch.append(np.copy(data[1:self.tsteps+1]))
-            ascii_list.append(self.valid_ascii_data[valid_ix])
-        one_hots = [to_one_hot(s, self.ascii_steps, self.alphabet) for s in ascii_list]
-        return x_batch, y_batch, ascii_list, one_hots
+        self.logger.write("\t\t{} individual data points".format(len(self.stroke_data)))
+        self.logger.write("\t\t{} batches".format(self.num_batches))
 
     def next_batch(self):
         # returns a randomized, tsteps-sized portion of the training data
@@ -244,7 +161,7 @@ class DataLoader():
         ascii_list = []
         for i in xrange(self.batch_size):
             data = self.stroke_data[self.idx_perm[self.pointer]]
-            data = np.vstack((data, [0, 0, 0]))
+            idx = random.randint(0, len(data)-self.tsteps-2)
             x_batch.append(np.copy(data[:self.tsteps]))
             y_batch.append(np.copy(data[1:self.tsteps+1]))
             ascii_list.append(self.ascii_data[self.idx_perm[self.pointer]])

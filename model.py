@@ -9,7 +9,7 @@ import tensorflow as tf
 from utils import *
 
 class Model():
-	def __init__(self, args, dataloader, logger):
+	def __init__(self, args, logger):
 		self.logger = logger
 
 		# ----- transfer some of the args params over to the model
@@ -20,13 +20,13 @@ class Model():
 		self.nmixtures = args.nmixtures
 		self.kmixtures = args.kmixtures
 		self.batch_size = args.batch_size if self.train else 1 # training/sampling specific
-		self.tsteps = dataloader.tsteps
-		self.alphabet = dataloader.alphabet
+		self.tsteps = args.tsteps if self.train else 1 # training/sampling specific
+		self.alphabet = args.alphabet
 		# training params
 		self.dropout = args.dropout
 		self.grad_clip = args.grad_clip
 		# misc
-		# self.tsteps_per_ascii = args.tsteps_per_ascii
+		self.tsteps_per_ascii = args.tsteps_per_ascii
 		self.data_dir = args.data_dir
 
 		self.graves_initializer = tf.truncated_normal_initializer(mean=0., stddev=.075, seed=None, dtype=tf.float32)
@@ -34,20 +34,19 @@ class Model():
 
 		self.logger.write('\tusing alphabet{}'.format(self.alphabet))
 		self.char_vec_len = len(self.alphabet) + 1 #plus one for <UNK> token
-		# self.ascii_steps = args.tsteps/args.tsteps_per_ascii
-		self.ascii_steps = dataloader.ascii_steps
+		self.ascii_steps = args.tsteps/args.tsteps_per_ascii
 
 
 		# ----- build the basic recurrent network architecture
-		cell_func = tf.contrib.rnn.LSTMCell # could be GRUCell or RNNCell
+		cell_func = tf.nn.rnn_cell.LSTMCell # could be GRUCell or RNNCell
 		self.cell0 = cell_func(args.rnn_size, state_is_tuple=True, initializer=self.graves_initializer)
 		self.cell1 = cell_func(args.rnn_size, state_is_tuple=True, initializer=self.graves_initializer)
 		self.cell2 = cell_func(args.rnn_size, state_is_tuple=True, initializer=self.graves_initializer)
 
 		if (self.train and self.dropout < 1): # training mode
-			self.cell0 = tf.contrib.rnn.DropoutWrapper(self.cell0, output_keep_prob = self.dropout)
-			self.cell1 = tf.contrib.rnn.DropoutWrapper(self.cell1, output_keep_prob = self.dropout)
-			self.cell2 = tf.contrib.rnn.DropoutWrapper(self.cell2, output_keep_prob = self.dropout)
+			self.cell0 = tf.nn.rnn_cell.DropoutWrapper(self.cell0, output_keep_prob = self.dropout)
+			self.cell1 = tf.nn.rnn_cell.DropoutWrapper(self.cell1, output_keep_prob = self.dropout)
+			self.cell2 = tf.nn.rnn_cell.DropoutWrapper(self.cell2, output_keep_prob = self.dropout)
 
 		self.input_data = tf.placeholder(dtype=tf.float32, shape=[None, self.tsteps, 3])
 		self.target_data = tf.placeholder(dtype=tf.float32, shape=[None, self.tsteps, 3])
@@ -56,9 +55,9 @@ class Model():
 		self.istate_cell2 = self.cell2.zero_state(batch_size=self.batch_size, dtype=tf.float32)
 
 		#slice the input volume into separate vols for each tstep
-		inputs = [tf.squeeze(input_, [1]) for input_ in tf.split(self.input_data, self.tsteps, 1)]
+		inputs = [tf.squeeze(input_, [1]) for input_ in tf.split(1, self.tsteps, self.input_data)]
 		#build cell0 computational graph
-		outs_cell0, self.fstate_cell0 = tf.contrib.legacy_seq2seq.rnn_decoder(inputs, self.istate_cell0, self.cell0, loop_function=None, scope='cell0')
+		outs_cell0, self.fstate_cell0 = tf.nn.seq2seq.rnn_decoder(inputs, self.istate_cell0, self.cell0, loop_function=None, scope='cell0')
 
 
 	# ----- build the gaussian character window
@@ -67,7 +66,7 @@ class Model():
 			# c -> [? x ascii_steps x alphabet] and is a tf matrix
 			ascii_steps = c.get_shape()[1].value #number of items in sequence
 			phi = get_phi(ascii_steps, alpha, beta, kappa)
-			window = tf.matmul(phi,c)
+			window = tf.batch_matmul(phi,c)
 			window = tf.squeeze(window, [1]) # window ~ [?,alphabet]
 			return window, phi
 
@@ -75,9 +74,9 @@ class Model():
 		def get_phi(ascii_steps, alpha, beta, kappa):
 			# alpha, beta, kappa -> [?,kmixtures,1] and each is a tf variable
 			u = np.linspace(0,ascii_steps-1,ascii_steps) # weight all the U items in the sequence
-			kappa_term = tf.square( tf.subtract(kappa,u))
-			exp_term = tf.multiply(-beta,kappa_term)
-			phi_k = tf.multiply(alpha, tf.exp(exp_term))
+			kappa_term = tf.square( tf.sub(kappa,u))
+			exp_term = tf.mul(-beta,kappa_term)
+			phi_k = tf.mul(alpha, tf.exp(exp_term))
 			phi = tf.reduce_sum(phi_k,1, keep_dims=True)
 			return phi # phi ~ [?,1,ascii_steps]
 
@@ -90,7 +89,7 @@ class Model():
 			abk_hats = tf.nn.xw_plus_b(out_cell0, window_w, window_b) # abk_hats ~ [?,n_out]
 			abk = tf.exp(tf.reshape(abk_hats, [-1, 3*kmixtures,1])) # abk_hats ~ [?,n_out] = "alpha, beta, kappa hats"
 
-			alpha, beta, kappa = tf.split(abk, 3, 1) # alpha_hat, etc ~ [?,kmixtures]
+			alpha, beta, kappa = tf.split(1, 3, abk) # alpha_hat, etc ~ [?,kmixtures]
 			kappa = kappa + prev_kappa
 			return alpha, beta, kappa # each ~ [?,kmixtures,1]
 
@@ -104,8 +103,8 @@ class Model():
 		for i in range(len(outs_cell0)):
 			[alpha, beta, new_kappa] = get_window_params(i, outs_cell0[i], self.kmixtures, prev_kappa, reuse=reuse)
 			window, phi = get_window(alpha, beta, new_kappa, self.char_seq)
-			outs_cell0[i] = tf.concat((outs_cell0[i],window), 1) #concat outputs
-			outs_cell0[i] = tf.concat((outs_cell0[i],inputs[i]), 1) #concat input data
+			outs_cell0[i] = tf.concat(1, (outs_cell0[i],window)) #concat outputs
+			outs_cell0[i] = tf.concat(1, (outs_cell0[i],inputs[i])) #concat input data
 			prev_kappa = new_kappa
 			prev_window = window
 			reuse = True
@@ -117,9 +116,9 @@ class Model():
 
 
 	# ----- finish building LSTMs 2 and 3
-		outs_cell1, self.fstate_cell1 = tf.contrib.legacy_seq2seq.rnn_decoder(outs_cell0, self.istate_cell1, self.cell1, loop_function=None, scope='cell1')
+		outs_cell1, self.fstate_cell1 = tf.nn.seq2seq.rnn_decoder(outs_cell0, self.istate_cell1, self.cell1, loop_function=None, scope='cell1')
 
-		outs_cell2, self.fstate_cell2 = tf.contrib.legacy_seq2seq.rnn_decoder(outs_cell1, self.istate_cell2, self.cell2, loop_function=None, scope='cell2')
+		outs_cell2, self.fstate_cell2 = tf.nn.seq2seq.rnn_decoder(outs_cell1, self.istate_cell2, self.cell2, loop_function=None, scope='cell2')
 
 	# ----- start building the Mixture Density Network on top (start with a dense layer to predict the MDN params)
 		n_out = 1 + self.nmixtures * 6 # params = end_of_stroke + 6 parameters per Gaussian
@@ -127,32 +126,32 @@ class Model():
 			mdn_w = tf.get_variable("output_w", [self.rnn_size, n_out], initializer=self.graves_initializer)
 			mdn_b = tf.get_variable("output_b", [n_out], initializer=self.graves_initializer)
 
-		out_cell2 = tf.reshape(tf.concat(outs_cell2, 1), [-1, args.rnn_size]) #concat outputs for efficiency
+		out_cell2 = tf.reshape(tf.concat(1, outs_cell2), [-1, args.rnn_size]) #concat outputs for efficiency
 		output = tf.nn.xw_plus_b(out_cell2, mdn_w, mdn_b) #data flows through dense nn
 
 
 	# ----- build mixture density cap on top of second recurrent cell
 		def gaussian2d(x1, x2, mu1, mu2, s1, s2, rho):
 			# define gaussian mdn (eq 24, 25 from http://arxiv.org/abs/1308.0850)
-			x_mu1 = tf.subtract(x1, mu1)
-			x_mu2 = tf.subtract(x2, mu2)
+			x_mu1 = tf.sub(x1, mu1)
+			x_mu2 = tf.sub(x2, mu2)
 			Z = tf.square(tf.div(x_mu1, s1)) + \
 			    tf.square(tf.div(x_mu2, s2)) - \
-			    2*tf.div(tf.multiply(rho, tf.multiply(x_mu1, x_mu2)), tf.multiply(s1, s2))
+			    2*tf.div(tf.mul(rho, tf.mul(x_mu1, x_mu2)), tf.mul(s1, s2))
 			rho_square_term = 1-tf.square(rho)
 			power_e = tf.exp(tf.div(-Z,2*rho_square_term))
-			regularize_term = 2*np.pi*tf.multiply(tf.multiply(s1, s2), tf.sqrt(rho_square_term))
+			regularize_term = 2*np.pi*tf.mul(tf.mul(s1, s2), tf.sqrt(rho_square_term))
 			gaussian = tf.div(power_e, regularize_term)
 			return gaussian
 
 		def get_loss(pi, x1_data, x2_data, eos_data, mu1, mu2, sigma1, sigma2, rho, eos):
 			# define loss function (eq 26 of http://arxiv.org/abs/1308.0850)
 			gaussian = gaussian2d(x1_data, x2_data, mu1, mu2, sigma1, sigma2, rho)
-			term1 = tf.multiply(gaussian, pi)
+			term1 = tf.mul(gaussian, pi)
 			term1 = tf.reduce_sum(term1, 1, keep_dims=True) #do inner summation
 			term1 = -tf.log(tf.maximum(term1, 1e-20)) # some errors are zero -> numerical errors.
 
-			term2 = tf.multiply(eos, eos_data) + tf.multiply(1-eos, 1-eos_data) #modified Bernoulli -> eos probability
+			term2 = tf.mul(eos, eos_data) + tf.mul(1-eos, 1-eos_data) #modified Bernoulli -> eos probability
 			term2 = -tf.log(term2) #negative log error gives loss
 
 			return tf.reduce_sum(term1 + term2) #do outer summation
@@ -161,7 +160,7 @@ class Model():
 		def get_mdn_coef(Z):
 			# returns the tf slices containing mdn dist params (eq 18...23 of http://arxiv.org/abs/1308.0850)
 			eos_hat = Z[:, 0:1] #end of sentence tokens
-			pi_hat, mu1_hat, mu2_hat, sigma1_hat, sigma2_hat, rho_hat = tf.split(Z[:, 1:], 6, 1)
+			pi_hat, mu1_hat, mu2_hat, sigma1_hat, sigma2_hat, rho_hat = tf.split(1, 6, Z[:, 1:])
 			self.pi_hat, self.sigma1_hat, self.sigma2_hat = \
 										pi_hat, sigma1_hat, sigma2_hat # these are useful for bias method during sampling
 
@@ -175,7 +174,7 @@ class Model():
 
 		# reshape target data (as we did the input data)
 		flat_target_data = tf.reshape(self.target_data,[-1, 3])
-		[x1_data, x2_data, eos_data] = tf.split(flat_target_data, 3, 1) #we might as well split these now
+		[x1_data, x2_data, eos_data] = tf.split(1, 3, flat_target_data) #we might as well split these now
 
 		[self.eos, self.pi, self.mu1, self.mu2, self.sigma1, self.sigma2, self.rho] = get_mdn_coef(output)
 
