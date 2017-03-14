@@ -16,7 +16,7 @@ Install dependencies (see below). You should `pip install jupyter` if you want t
 * download and unzip pretrained model: `wget http://caligari.dartmouth.edu/~sgreydan/scribe/saved.tgz && tar xvfz saved.tgz`
 
 Now you have two options:
-1. Run the sampler in bash: `mkdir -p ./logs/figures && python run.py --sample --tsteps 256`
+1. Run the sampler in bash: `mkdir -p ./logs/figures && python run.py --sample --tsteps 700`
 2. Open the sample.ipynb jupyter notebook and run cell-by-cell (it includes equations and text to explain how the model works)
 
 
