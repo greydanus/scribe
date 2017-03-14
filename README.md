@@ -10,7 +10,7 @@ For an easy intro to the code (along with equations and explanations) check out 
 
 Getting started
 --------
-Make sure you have all the dependencies (listed below) installed. If you want to run the Jupyter notebooks, you should also `pip instal jupyter`
+Install dependencies (see below). You should `pip install jupyter` if you want to use the Jupyter notebooks
 * download the repo
 * navigate to the repo in bash
 * download and unzip pretrained model: `wget http://caligari.dartmouth.edu/~sgreydan/scribe/saved.tgz && tar xvfz saved.tgz`
