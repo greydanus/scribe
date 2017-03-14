@@ -10,7 +10,7 @@ For an easy intro to the code (along with equations and explanations) check out 
 
 Getting started
 --------
-Install dependencies (see below). You should `pip install jupyter` if you want to use the Jupyter notebooks
+* install dependencies (see below).
 * download the repo
 * navigate to the repo in bash
 * download and unzip pretrained model: `wget http://caligari.dartmouth.edu/~sgreydan/scribe/saved.tgz && tar xvfz saved.tgz`
@@ -39,3 +39,4 @@ Dependencies
  * Numpy
  * Matplotlib
  * [TensorFlow 1.0](https://www.tensorflow.org/install/)
+ * OPTIONAL: [Jupyter](https://jupyter.org/) (if you want to run sample.ipynb and dataloader.ipynb)
