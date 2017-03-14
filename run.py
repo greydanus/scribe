@@ -15,9 +15,9 @@ def main():
 	#general model params
 	parser.add_argument('--train', dest='train', action='store_true', help='train the model')
 	parser.add_argument('--sample', dest='train', action='store_false', help='sample from the model')
-	parser.add_argument('--rnn_size', type=int, default=400, help='size of RNN hidden state')
-	parser.add_argument('--tsteps', type=int, default=256, help='RNN time steps (for backprop)')
-	parser.add_argument('--nmixtures', type=int, default=20, help='number of gaussian mixtures')
+	parser.add_argument('--rnn_size', type=int, default=100, help='size of RNN hidden state')
+	parser.add_argument('--tsteps', type=int, default=150, help='RNN time steps (for backprop)')
+	parser.add_argument('--nmixtures', type=int, default=8, help='number of gaussian mixtures')
 
 	# window params
 	parser.add_argument('--kmixtures', type=int, default=1, help='number of gaussian mixtures for character window')
@@ -34,15 +34,15 @@ def main():
 	parser.add_argument('--grad_clip', type=float, default=10., help='clip gradients to this magnitude')
 	parser.add_argument('--optimizer', type=str, default='rmsprop', help="ctype of optimizer: 'rmsprop' 'adam'")
 	parser.add_argument('--learning_rate', type=float, default=1e-4, help='learning rate')
-	parser.add_argument('--lr_decay', type=float, default=0.99, help='decay rate for learning rate')
+	parser.add_argument('--lr_decay', type=float, default=1.0, help='decay rate for learning rate')
 	parser.add_argument('--decay', type=float, default=0.95, help='decay rate for rmsprop')
 	parser.add_argument('--momentum', type=float, default=0.9, help='momentum for rmsprop')
 
 	#book-keeping
 	parser.add_argument('--data_scale', type=int, default=50, help='amount to scale data down before training')
-	parser.add_argument('--log_dir', type=str, default='../public_html/', help='location, relative to execution, of log files')
+	parser.add_argument('--log_dir', type=str, default='./logs/', help='location, relative to execution, of log files')
 	parser.add_argument('--data_dir', type=str, default='./data', help='location, relative to execution, of data')
-	parser.add_argument('--save_path', type=str, default='models/model.ckpt', help='location to save model')
+	parser.add_argument('--save_path', type=str, default='saved/model.ckpt', help='location to save model')
 	parser.add_argument('--save_every', type=int, default=500, help='number of batches between each save')
 
 	#sampling
@@ -53,23 +53,18 @@ def main():
 	parser.set_defaults(train=True)
 	args = parser.parse_args()
 
+	train_model(args) if args.train else sample_model(args)
 
+def train_model(args):
 	logger = Logger(args) # make logging utility
+	logger.write("\nTRAINING MODE...")
 	logger.write("{}\n".format(args))
 	logger.write("loading data...")
 	data_loader = DataLoader(args, logger=logger)
 	
 	logger.write("building model...")
-	# temporary hack until we can refactor
-	model = Model(args, data_loader, logger=logger)
+	model = Model(args, logger=logger)
 
-	if args.train:
-		train_model(args, logger, data_loader, model)
-	else:
-		sample_model(args, logger, data_loader, model)
-
-def train_model(args, logger, data_loader, model):
-	logger.write("\nTRAINING MODE...")
 	logger.write("attempt to load saved model...")
 	load_was_success, global_step = model.try_load_model(args.save_path)
 
@@ -114,14 +109,19 @@ def train_model(args, logger, data_loader, model):
 			if i % 10 is 0: logger.write("{}/{}, loss = {:.3f}, regloss = {:.5f}, valid_loss = {:.3f}, time = {:.3f}" \
 				.format(i, args.nepochs * args.nbatches, train_loss, running_average, valid_loss, end - start) )
 
-def sample_model(args, logger, data_loader, model):
-	logger.write("\nSAMPLING MODE...")
-
+def sample_model(args, logger=None):
 	if args.text == '':
 		strings = ['call me ishmael some years ago', 'A project by Sam Greydanus', 'mmm mmm mmm mmm mmm mmm mmm', \
 			'What I cannot create I do not understand', 'You know nothing Jon Snow'] # test strings
 	else:
 		strings = [args.text]
+
+	logger = Logger(args) if logger is None else logger # instantiate logger, if None
+	logger.write("\nSAMPLING MODE...")
+	logger.write("loading data...")
+	
+	logger.write("building model...")
+	model = Model(args, logger)
 
 	logger.write("attempt to load saved model...")
 	load_was_success, global_step = model.try_load_model(args.save_path)
