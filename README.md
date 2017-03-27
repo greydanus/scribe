@@ -40,9 +40,10 @@ Now you have two options:
 
 About
 --------
-This model is trained on the IAM handwriting dataset and was inspired by the model described by the famous 2014 Alex Graves [paper](https://arxiv.org/abs/1308.0850). It consists of a three-layer recurrent neural network (LSTM cells) with a Gaussian Mixture Density Network (MDN) cap on top. I have also implemented the attention mechanism from the paper which allows the network to 'focus' on character at a time in a sequence as it draws them.
+This model is trained on the [IAM handwriting dataset](http://www.fki.inf.unibe.ch/databases/iam-handwriting-database) and was inspired by the model described by the famous 2014 Alex Graves [paper](https://arxiv.org/abs/1308.0850). It consists of a three-layer recurrent neural network (LSTM cells) with a Gaussian Mixture Density Network (MDN) cap on top. I have also implemented the attention mechanism from the paper which allows the network to 'focus' on character at a time in a sequence as it draws them.
 
-The model at one time step looks like this: 
+The model at one time step looks like this
+
 ![Rolled model](static/model_rolled.png?raw=true)
 
 Unrolling in time, we get
