@@ -1,9 +1,9 @@
 Scribe: Realistic Handwriting in Tensorflow
 =======
-See [blog post](https://greydanus.github.io/2016/08/21/handwriting/)
-
 ![Sample output](static/author.png?raw=true)
 _An example output of the model_
+
+See [blog post](https://greydanus.github.io/2016/08/21/handwriting/)
 
 Jupyter Notebooks
 --------
