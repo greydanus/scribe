@@ -31,7 +31,8 @@ Getting started
 * install dependencies (see below).
 * download the repo
 * navigate to the repo in bash
-* download and unzip pretrained models, placing in a directory named `saved`: [https://goo.gl/qbH2uw](https://goo.gl/qbH2uw)
+* download and unzip folder containing pretrained models: [https://goo.gl/qbH2uw](https://goo.gl/qbH2uw)
+  * place in this directory
 
 Now you have two options:
 1. Run the sampler in bash: `mkdir -p ./logs/figures && python run.py --sample --tsteps 700`
