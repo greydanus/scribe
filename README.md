@@ -31,7 +31,7 @@ Getting started
 * install dependencies (see below).
 * download the repo
 * navigate to the repo in bash
-* download and unzip folder containing pretrained models: [https://goo.gl/qbH2uw](https://goo.gl/qbH2uw)
+* download and unzip folder containing pretrained models: [Google Drive link](https://drive.google.com/file/d/0B-HNE76mR97FVkpJZnZuTEhBaFU/view?usp=sharing&resourcekey=0-jOyX1iLpam9C2wsT7Z1-0w)
   * place in this directory
 
 Now you have two options:
